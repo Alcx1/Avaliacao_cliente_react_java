@@ -1,0 +1,255 @@
+package br.com.meuapp.clienteavaliacao;
+
+import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import javax.swing.border.LineBorder;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.geom.RoundRectangle2D;
+import java.net.URL;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Random;
+
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.BitMatrix;
+import com.google.zxing.WriterException;
+import com.google.zxing.client.j2se.MatrixToImageWriter;
+import com.google.zxing.qrcode.QRCodeWriter;
+
+public class ClienteAvaliacaoGUI {
+    private JFrame frame;
+    private JTextField txtNumeroPedido;
+    private StarRater starRaterPedido;
+    private StarRater starRaterAtendimento;
+    private StarRater starRaterEstabelecimento;
+    private StarRater starRaterLocalizacao;
+    private JLabel lblCupom;
+    private JLabel qrCodeLabel;
+
+    public ClienteAvaliacaoGUI() {
+        initialize();
+    }
+
+    private void initialize() {
+        frame = new JFrame();
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setUndecorated(true);  // Desativar a decoração do JFrame
+        frame.setSize(600, 700);
+        frame.setShape(new RoundRectangle2D.Double(0, 0, frame.getWidth(), frame.getHeight(), 50, 50));
+        frame.setLocationRelativeTo(null);
+
+        JPanel panel = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                g.setColor(new Color(245, 245, 245)); // Light grey background
+                g.fillRect(0, 0, getWidth(), getHeight());
+            }
+        };
+        panel.setBorder(new EmptyBorder(20, 20, 20, 20));
+        frame.setContentPane(panel);
+        panel.setLayout(new GridBagLayout());
+
+        JLabel lblTitulo = new JLabel("Avaliação de Pedidos");
+        lblTitulo.setFont(new Font("Arial", Font.BOLD, 24));
+        lblTitulo.setHorizontalAlignment(SwingConstants.CENTER);
+
+        JLabel lblNumeroPedido = new JLabel("Número do Pedido:");
+        lblNumeroPedido.setFont(new Font("Arial", Font.PLAIN, 16));
+        txtNumeroPedido = new JTextField();
+        txtNumeroPedido.setColumns(10);
+
+        JLabel lblAvaliacaoPedido = new JLabel("Avaliação do Pedido:");
+        lblAvaliacaoPedido.setFont(new Font("Arial", Font.PLAIN, 16));
+        starRaterPedido = new StarRater(5, 0);
+
+        JLabel lblAvaliacaoAtendimento = new JLabel("Atendimento ao Cliente:");
+        lblAvaliacaoAtendimento.setFont(new Font("Arial", Font.PLAIN, 16));
+        starRaterAtendimento = new StarRater(5, 0);
+
+        JLabel lblAvaliacaoEstabelecimento = new JLabel("Estabelecimento:");
+        lblAvaliacaoEstabelecimento.setFont(new Font("Arial", Font.PLAIN, 16));
+        starRaterEstabelecimento = new StarRater(5, 0);
+
+        JLabel lblAvaliacaoLocalizacao = new JLabel("Localização:");
+        lblAvaliacaoLocalizacao.setFont(new Font("Arial", Font.PLAIN, 16));
+        starRaterLocalizacao = new StarRater(5, 0);
+
+        JButton btnAvaliar = new JButton("Avaliar");
+        btnAvaliar.setFont(new Font("Arial", Font.BOLD, 16));
+        btnAvaliar.setBackground(new Color(70, 130, 180));
+        btnAvaliar.setForeground(Color.WHITE);
+        btnAvaliar.setBorder(new LineBorder(new Color(0, 0, 128), 1, true));
+        btnAvaliar.setFocusPainted(false);
+        btnAvaliar.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String numeroPedido = txtNumeroPedido.getText();
+                int avaliacaoPedido = starRaterPedido.getRating();
+                int avaliacaoAtendimento = starRaterAtendimento.getRating();
+                int avaliacaoEstabelecimento = starRaterEstabelecimento.getRating();
+                int avaliacaoLocalizacao = starRaterLocalizacao.getRating();
+                avaliarPedido(numeroPedido, avaliacaoPedido, avaliacaoAtendimento, avaliacaoEstabelecimento, avaliacaoLocalizacao);
+            }
+        });
+
+        lblCupom = new JLabel("");
+        lblCupom.setFont(new Font("Arial", Font.BOLD, 14));
+        lblCupom.setHorizontalAlignment(SwingConstants.CENTER);
+        lblCupom.setVerticalAlignment(SwingConstants.TOP);
+        lblCupom.setBorder(new EmptyBorder(10, 0, 0, 0));
+
+        qrCodeLabel = new JLabel();
+        qrCodeLabel.setHorizontalAlignment(SwingConstants.CENTER);
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        gbc.gridwidth = GridBagConstraints.REMAINDER;
+        gbc.anchor = GridBagConstraints.CENTER;
+        gbc.weightx = 1.0;
+        panel.add(lblTitulo, gbc);
+
+        gbc.gridwidth = 1;
+        gbc.anchor = GridBagConstraints.LINE_END;
+        panel.add(lblNumeroPedido, gbc);
+
+        gbc.gridwidth = GridBagConstraints.REMAINDER;
+        gbc.anchor = GridBagConstraints.LINE_START;
+        panel.add(txtNumeroPedido, gbc);
+
+        gbc.gridwidth = 1;
+        gbc.anchor = GridBagConstraints.LINE_END;
+        panel.add(lblAvaliacaoPedido, gbc);
+
+        gbc.gridwidth = GridBagConstraints.REMAINDER;
+        gbc.anchor = GridBagConstraints.LINE_START;
+        panel.add(starRaterPedido, gbc);
+
+        gbc.gridwidth = 1;
+        gbc.anchor = GridBagConstraints.LINE_END;
+        panel.add(lblAvaliacaoAtendimento, gbc);
+
+        gbc.gridwidth = GridBagConstraints.REMAINDER;
+        gbc.anchor = GridBagConstraints.LINE_START;
+        panel.add(starRaterAtendimento, gbc);
+
+        gbc.gridwidth = 1;
+        gbc.anchor = GridBagConstraints.LINE_END;
+        panel.add(lblAvaliacaoEstabelecimento, gbc);
+
+        gbc.gridwidth = GridBagConstraints.REMAINDER;
+        gbc.anchor = GridBagConstraints.LINE_START;
+        panel.add(starRaterEstabelecimento, gbc);
+
+        gbc.gridwidth = 1;
+        gbc.anchor = GridBagConstraints.LINE_END;
+        panel.add(lblAvaliacaoLocalizacao, gbc);
+
+        gbc.gridwidth = GridBagConstraints.REMAINDER;
+        gbc.anchor = GridBagConstraints.LINE_START;
+        panel.add(starRaterLocalizacao, gbc);
+
+        gbc.anchor = GridBagConstraints.CENTER;
+        panel.add(btnAvaliar, gbc);
+
+        gbc.gridwidth = GridBagConstraints.REMAINDER;
+        panel.add(lblCupom, gbc);
+
+        gbc.gridwidth = GridBagConstraints.REMAINDER;
+        gbc.fill = GridBagConstraints.BOTH;
+        gbc.weighty = 1.0;
+        panel.add(qrCodeLabel, gbc);
+
+        frame.setVisible(true);
+    }
+
+    private void avaliarPedido(String numeroPedido, int avaliacaoPedido, int avaliacaoAtendimento, int avaliacaoEstabelecimento, int avaliacaoLocalizacao) {
+        if (isPedidoValido(numeroPedido)) {
+            salvarAvaliacao(numeroPedido, avaliacaoPedido, avaliacaoAtendimento, avaliacaoEstabelecimento, avaliacaoLocalizacao);
+            String cupom = gerarCupom();
+            salvarCupom(numeroPedido, cupom);
+            lblCupom.setText("<html>Obrigado pela avaliação!<br>Seu cupom de desconto é: " + cupom + "</html>");
+            gerarQRCode(cupom);
+        } else {
+            lblCupom.setText("Número de pedido inválido.");
+        }
+    }
+
+    private boolean isPedidoValido(String numeroPedido) {
+        String sql = "SELECT COUNT(*) FROM pedidos WHERE numero_pedido = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, numeroPedido);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt(1) > 0;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    private void salvarAvaliacao(String numeroPedido, int avaliacaoPedido, int avaliacaoAtendimento, int avaliacaoEstabelecimento, int avaliacaoLocalizacao) {
+        String sql = "INSERT INTO avaliacoes (numero_pedido, avaliacao_pedido, avaliacao_atendimento, avaliacao_estabelecimento, avaliacao_localizacao) VALUES (?, ?, ?, ?, ?)";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, numeroPedido);
+            stmt.setInt(2, avaliacaoPedido);
+            stmt.setInt(3, avaliacaoAtendimento);
+            stmt.setInt(4, avaliacaoEstabelecimento);
+            stmt.setInt(5, avaliacaoLocalizacao);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private String gerarCupom() {
+        Random random = new Random();
+        int codigo = random.nextInt(999999);
+        return "CUPOM" + String.format("%06d", codigo);
+    }
+
+    private void salvarCupom(String numeroPedido, String cupom) {
+        String sql = "UPDATE pedidos SET cupom = ? WHERE numero_pedido = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, cupom);
+            stmt.setString(2, numeroPedido);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void gerarQRCode(String texto) {
+        int tamanho = 200;
+        try {
+            QRCodeWriter qrCodeWriter = new QRCodeWriter();
+            BitMatrix bitMatrix = qrCodeWriter.encode(texto, BarcodeFormat.QR_CODE, tamanho, tamanho);
+            ImageIcon qrCodeIcon = new ImageIcon(MatrixToImageWriter.toBufferedImage(bitMatrix));
+            qrCodeLabel.setIcon(qrCodeIcon);
+        } catch (WriterException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void main(String[] args) {
+        EventQueue.invokeLater(new Runnable() {
+            public void run() {
+                try {
+                    new ClienteAvaliacaoGUI();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
+}

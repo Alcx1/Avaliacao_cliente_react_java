@@ -1,0 +1,243 @@
+package br.com.meuapp.clienteavaliacao;
+
+import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.geom.RoundRectangle2D;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.util.Enumeration;
+import java.util.Random;
+
+public class PesquisaSatisfacaoGUI {
+    private JFrame frame;
+    private ButtonGroup atendimentoGroup;
+    private ButtonGroup estabelecimentoGroup;
+    private ButtonGroup localizacaoGroup;
+    private ButtonGroup pratosGroup;
+    private ButtonGroup recomendacaoGroup;
+
+    public PesquisaSatisfacaoGUI() {
+        initialize();
+    }
+
+    private void initialize() {
+        frame = new JFrame();
+        frame.setSize(800, 600);
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setLocationRelativeTo(null);
+
+        // Set rounded corners before displaying the frame
+        frame.setShape(new RoundRectangle2D.Double(0, 0, frame.getWidth(), frame.getHeight(), 20, 20));
+
+        JPanel mainPanel = new RoundedPanel(20);
+        mainPanel.setLayout(new BorderLayout());
+        mainPanel.setBorder(new EmptyBorder(20, 20, 20, 20));
+        mainPanel.setBackground(Color.WHITE);
+
+
+        JPanel headerPanel = new JPanel();
+        headerPanel.setBackground(Color.WHITE);
+        JLabel headerLabel = new JLabel("Pesquisa de Satisfação do Cliente");
+        headerLabel.setFont(new Font("Arial", Font.BOLD, 28));
+        headerLabel.setForeground(new Color(178, 34, 34));
+        headerPanel.add(headerLabel);
+
+        JPanel contentPanel = new JPanel(new GridBagLayout());
+        contentPanel.setBackground(Color.WHITE);
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.anchor = GridBagConstraints.WEST;
+
+        adicionarCampoAvaliacao(contentPanel, gbc, "Atendimento ao Cliente", atendimentoGroup = new ButtonGroup(), 0);
+        adicionarCampoAvaliacao(contentPanel, gbc, "Estabelecimento", estabelecimentoGroup = new ButtonGroup(), 1);
+        adicionarCampoAvaliacao(contentPanel, gbc, "Localização", localizacaoGroup = new ButtonGroup(), 2);
+        adicionarCampoAvaliacao(contentPanel, gbc, "Nossos Pratos", pratosGroup = new ButtonGroup(), 3);
+
+        // Recommendation
+        gbc.gridy = 4;
+        gbc.gridx = 0;
+        gbc.gridwidth = 1;
+        JLabel recomendacaoLabel = new JLabel("Qual é a probabilidade de você recomendar nossa loja a um amigo?");
+        recomendacaoLabel.setFont(new Font("Arial", Font.PLAIN, 16));
+        recomendacaoLabel.setForeground(new Color(178, 34, 34));
+        contentPanel.add(recomendacaoLabel, gbc);
+
+        recomendacaoGroup = new ButtonGroup();
+        gbc.gridy = 5;
+        gbc.gridwidth = 10;
+        for (int i = 1; i <= 10; i++) {
+            gbc.gridx = i;
+            JRadioButton rb = new JRadioButton(String.valueOf(i));
+            rb.setBackground(Color.WHITE);
+            rb.setForeground(new Color(255, 140, 0));
+            contentPanel.add(rb, gbc);
+            recomendacaoGroup.add(rb);
+        }
+
+        // Submit button
+        gbc.gridy = 6;
+        gbc.gridx = 0;
+        gbc.gridwidth = 10;
+        gbc.anchor = GridBagConstraints.CENTER;
+        JButton enviarButton = new JButton("Enviar");
+        enviarButton.setFont(new Font("Arial", Font.BOLD, 16));
+        enviarButton.setBackground(new Color(178, 34, 34));
+        enviarButton.setForeground(Color.WHITE);
+        enviarButton.setFocusPainted(false);
+        enviarButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (validarFormulario()) {
+                    String numeroPedido = JOptionPane.showInputDialog(frame, "Informe o número do pedido:");
+                    if (numeroPedido != null && !numeroPedido.trim().isEmpty()) {
+                        int atendimento = getSelectedButtonIndex(atendimentoGroup);
+                        int estabelecimento = getSelectedButtonIndex(estabelecimentoGroup);
+                        int localizacao = getSelectedButtonIndex(localizacaoGroup);
+                        int pratos = getSelectedButtonIndex(pratosGroup);
+                        int recomendacao = getSelectedButtonIndex(recomendacaoGroup) + 1;
+                        salvarAvaliacao(numeroPedido, atendimento, estabelecimento, localizacao, pratos, recomendacao);
+                    }
+                } else {
+                    JOptionPane.showMessageDialog(frame, "Por favor, preencha todas as avaliações.", "Erro", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        });
+        contentPanel.add(enviarButton, gbc);
+
+        mainPanel.add(headerPanel, BorderLayout.NORTH);
+        mainPanel.add(contentPanel, BorderLayout.CENTER);
+
+        frame.setContentPane(mainPanel);
+    }
+
+    private void adicionarCampoAvaliacao(JPanel panel, GridBagConstraints gbc, String label, ButtonGroup group, int row) {
+        gbc.gridy = row;
+        gbc.gridx = 0;
+        gbc.gridwidth = 1;
+        JLabel campoLabel = new JLabel(label);
+        campoLabel.setFont(new Font("Arial", Font.PLAIN, 16));
+        campoLabel.setForeground(new Color(178, 34, 34));
+        panel.add(campoLabel, gbc);
+
+        for (int i = 1; i <= 5; i++) {
+            gbc.gridx = i;
+            JRadioButton rb = new JRadioButton();
+            rb.setBackground(Color.WHITE);
+            rb.setForeground(new Color(255, 140, 0));
+            panel.add(rb, gbc);
+            group.add(rb);
+        }
+    }
+
+    private boolean validarFormulario() {
+        return atendimentoGroup.getSelection() != null
+                && estabelecimentoGroup.getSelection() != null
+                && localizacaoGroup.getSelection() != null
+                && pratosGroup.getSelection() != null
+                && recomendacaoGroup.getSelection() != null;
+    }
+
+    private int getSelectedButtonIndex(ButtonGroup group) {
+        int index = 0;
+        for (Enumeration<AbstractButton> buttons = group.getElements(); buttons.hasMoreElements(); index++) {
+            AbstractButton button = buttons.nextElement();
+            if (button.isSelected()) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private void salvarAvaliacao(String numeroPedido, int atendimento, int estabelecimento, int localizacao, int pratos, int recomendacao) {
+        if (isPedidoValido(numeroPedido)) {
+            try (Connection conn = DatabaseConnection.getConnection()) {
+                String sql = "INSERT INTO avaliacoes (numero_pedido, atendimento_cliente, estabelecimento, localizacao, pratos, recomendacao) VALUES (?, ?, ?, ?, ?, ?)";
+                try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                    stmt.setString(1, numeroPedido);
+                    stmt.setInt(2, atendimento + 1); // Ajuste para 1-based index
+                    stmt.setInt(3, estabelecimento + 1); // Ajuste para 1-based index
+                    stmt.setInt(4, localizacao + 1); // Ajuste para 1-based index
+                    stmt.setInt(5, pratos + 1); // Ajuste para 1-based index
+                    stmt.setInt(6, recomendacao);
+                    stmt.executeUpdate();
+                }
+                String cupom = gerarCupom();
+                salvarCupom(numeroPedido, cupom);
+                JOptionPane.showMessageDialog(frame, "<html>Obrigado pela avaliação!<br>Seu cupom de desconto é: " + cupom + "</html>");
+            } catch (SQLException e) {
+                e.printStackTrace();
+                JOptionPane.showMessageDialog(frame, "Erro ao salvar a avaliação.", "Erro", JOptionPane.ERROR_MESSAGE);
+            }
+        } else {
+            JOptionPane.showMessageDialog(frame, "Número de pedido inválido.", "Erro", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private boolean isPedidoValido(String numeroPedido) {
+        // Implementar lógica de validação do número do pedido, se necessário
+        return true; // Exemplo simples que considera todos os pedidos válidos
+    }
+
+    private void salvarCupom(String numeroPedido, String cupom) throws SQLException {
+        try (Connection conn = DatabaseConnection.getConnection()) {
+            String sql = "INSERT INTO cupons (numero_pedido, cupom) VALUES (?, ?)";
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setString(1, numeroPedido);
+                stmt.setString(2, cupom);
+                stmt.executeUpdate();
+            }
+        }
+    }
+
+    private String gerarCupom() {
+        String caracteres = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        StringBuilder cupom = new StringBuilder(10);
+        Random random = new Random();
+        for (int i = 0; i < 10; i++) {
+            cupom.append(caracteres.charAt(random.nextInt(caracteres.length())));
+        }
+        return cupom.toString();
+    }
+
+    public static void main(String[] args) {
+        EventQueue.invokeLater(new Runnable() {
+            public void run() {
+                try {
+                    PesquisaSatisfacaoGUI window = new PesquisaSatisfacaoGUI();
+                    window.frame.setVisible(true);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
+}
+
+class RoundedPanel extends JPanel {
+    private int cornerRadius;
+
+    public RoundedPanel(int radius) {
+        super();
+        cornerRadius = radius;
+    }
+
+    @Override
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
+        Dimension arcs = new Dimension(cornerRadius, cornerRadius);
+        int width = getWidth();
+        int height = getHeight();
+        Graphics2D graphics = (Graphics2D) g;
+        graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        graphics.setColor(getBackground());
+        graphics.fillRoundRect(0, 0, width - 1, height - 1, arcs.width, arcs.height);
+        graphics.setColor(getForeground());
+        graphics.drawRoundRect(0, 0, width - 1, height - 1, arcs.width, arcs.height);
+    }
+}

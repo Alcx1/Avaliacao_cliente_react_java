@@ -1,0 +1,292 @@
+package br.com.meuapp.clienteavaliacao;
+
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.EncodeHintType;
+import com.google.zxing.qrcode.QRCodeWriter;
+import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
+import com.google.zxing.common.BitMatrix;
+import java.net.URL;
+import javax.imageio.ImageIO;
+import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import javax.swing.border.LineBorder;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.geom.RoundRectangle2D;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.Hashtable;
+import java.util.Random;
+
+public class ClienteAvaliacaoGUI {
+    private JWindow window;
+    private JTextField txtNumeroPedido;
+    private StarRater atendimentoRater;
+    private StarRater estabelecimentoRater;
+    private StarRater localizacaoRater;
+    private StarRater pratosRater;
+    private JLabel lblCupom;
+    private JLabel lblQRCode;
+
+    public ClienteAvaliacaoGUI() {
+        initialize();
+    }
+
+    private void initialize() {
+        window = new JWindow();
+        window.setSize(600, 600); // Ajuste o tamanho para acomodar o QR code
+        window.setShape(new RoundRectangle2D.Double(0, 0, window.getWidth(), window.getHeight(), 50, 50)); // Arredondar cantos
+        window.setLocationRelativeTo(null);
+
+        JPanel panel = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                g.setColor(new Color(245, 245, 245)); // Light grey background
+                g.fillRect(0, 0, getWidth(), getHeight());
+            }
+        };
+        panel.setBorder(new EmptyBorder(20, 20, 20, 20));
+        window.setContentPane(panel);
+        panel.setLayout(new GridBagLayout());
+
+        JLabel lblTitulo = new JLabel("Avaliação de Pedidos");
+        lblTitulo.setFont(new Font("Arial", Font.BOLD, 24));
+        lblTitulo.setHorizontalAlignment(SwingConstants.CENTER);
+
+        JLabel lblNumeroPedido = new JLabel("Número do Pedido:");
+        lblNumeroPedido.setFont(new Font("Arial", Font.PLAIN, 16));
+        txtNumeroPedido = new JTextField();
+        txtNumeroPedido.setColumns(10);
+
+        // Carregar ícones
+        ImageIcon atendimentoIcon = carregarIcone("/icons/atendimento.png");
+        ImageIcon estabelecimentoIcon = carregarIcone("/icons/estabelecimento.png");
+        ImageIcon localizacaoIcon = carregarIcone("/icons/localizacao.png");
+        ImageIcon pratosIcon = carregarIcone("/icons/pratos.png");
+
+        // Campos de Avaliação com Ícones
+        JLabel lblAtendimento = new JLabel("Atendimento ao Cliente:");
+        lblAtendimento.setFont(new Font("Arial", Font.PLAIN, 16));
+        if (atendimentoIcon != null) {
+            lblAtendimento.setIcon(atendimentoIcon);
+        }
+        atendimentoRater = new StarRater(5, 0);
+
+        JLabel lblEstabelecimento = new JLabel("Estabelecimento:");
+        lblEstabelecimento.setFont(new Font("Arial", Font.PLAIN, 16));
+        if (estabelecimentoIcon != null) {
+            lblEstabelecimento.setIcon(estabelecimentoIcon);
+        }
+        estabelecimentoRater = new StarRater(5, 0);
+
+        JLabel lblLocalizacao = new JLabel("Localização:");
+        lblLocalizacao.setFont(new Font("Arial", Font.PLAIN, 16));
+        if (localizacaoIcon != null) {
+            lblLocalizacao.setIcon(localizacaoIcon);
+        }
+        localizacaoRater = new StarRater(5, 0);
+
+        JLabel lblPratos = new JLabel("Nossos Pratos:");
+        lblPratos.setFont(new Font("Arial", Font.PLAIN, 16));
+        if (pratosIcon != null) {
+            lblPratos.setIcon(pratosIcon);
+        }
+        pratosRater = new StarRater(5, 0);
+
+        JButton btnAvaliar = new JButton("Avaliar");
+        btnAvaliar.setFont(new Font("Arial", Font.BOLD, 16));
+        btnAvaliar.setBackground(new Color(178, 34, 34));
+        btnAvaliar.setForeground(Color.WHITE);
+        btnAvaliar.setBorder(new LineBorder(new Color(0, 0, 128), 1, true));
+        btnAvaliar.setFocusPainted(false);
+        btnAvaliar.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String numeroPedido = txtNumeroPedido.getText();
+                int atendimento = atendimentoRater.getRating();
+                int estabelecimento = estabelecimentoRater.getRating();
+                int localizacao = localizacaoRater.getRating();
+                int pratos = pratosRater.getRating();
+                avaliarPedido(numeroPedido, atendimento, estabelecimento, localizacao, pratos);
+            }
+        });
+
+        lblCupom = new JLabel("");
+        lblCupom.setFont(new Font("Arial", Font.BOLD, 14));
+        lblCupom.setHorizontalAlignment(SwingConstants.CENTER);
+        lblCupom.setVerticalAlignment(SwingConstants.TOP);
+        lblCupom.setBorder(new EmptyBorder(10, 0, 0, 0));
+
+        lblQRCode = new JLabel("");
+        lblQRCode.setHorizontalAlignment(SwingConstants.CENTER);
+        lblQRCode.setVerticalAlignment(SwingConstants.TOP);
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        gbc.gridwidth = GridBagConstraints.REMAINDER;
+        gbc.anchor = GridBagConstraints.CENTER;
+        gbc.weightx = 1.0;
+        panel.add(lblTitulo, gbc);
+
+        gbc.gridwidth = 1;
+        gbc.anchor = GridBagConstraints.LINE_END;
+        panel.add(lblNumeroPedido, gbc);
+
+        gbc.gridwidth = GridBagConstraints.REMAINDER;
+        gbc.anchor = GridBagConstraints.LINE_START;
+        panel.add(txtNumeroPedido, gbc);
+
+        adicionarCampoAvaliacao(panel, gbc, lblAtendimento, atendimentoRater);
+        adicionarCampoAvaliacao(panel, gbc, lblEstabelecimento, estabelecimentoRater);
+        adicionarCampoAvaliacao(panel, gbc, lblLocalizacao, localizacaoRater);
+        adicionarCampoAvaliacao(panel, gbc, lblPratos, pratosRater);
+
+        gbc.anchor = GridBagConstraints.CENTER;
+        panel.add(btnAvaliar, gbc);
+
+        gbc.gridwidth = GridBagConstraints.REMAINDER;
+        panel.add(lblCupom, gbc);
+        panel.add(lblQRCode, gbc);
+    }
+
+    private void adicionarCampoAvaliacao(JPanel panel, GridBagConstraints gbc, JLabel label, StarRater rater) {
+        gbc.gridwidth = 1;
+        gbc.anchor = GridBagConstraints.LINE_END;
+        panel.add(label, gbc);
+
+        gbc.gridwidth = GridBagConstraints.REMAINDER;
+        gbc.anchor = GridBagConstraints.LINE_START;
+        panel.add(rater, gbc);
+    }
+
+    private void avaliarPedido(String numeroPedido, int atendimento, int estabelecimento, int localizacao, int pratos) {
+        if (isPedidoValido(numeroPedido)) {
+            salvarAvaliacao(numeroPedido, atendimento, estabelecimento, localizacao, pratos);
+            String cupom = gerarCupom();
+            salvarCupom(numeroPedido, cupom);
+            lblCupom.setText("<html>Obrigado pela avaliação!<br>Seu cupom de desconto é: " + cupom + "<br> <a href='https://www.example.com'>Visite nosso site</a></html>");
+            gerarQRCode(cupom);
+        } else {
+            lblCupom.setText("Número de pedido inválido.");
+        }
+    }
+
+    private boolean isPedidoValido(String numeroPedido) {
+        String sql = "SELECT COUNT(*) FROM pedidos WHERE numero_pedido = ?";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, numeroPedido);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getInt(1) > 0;
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    private void salvarAvaliacao(String numeroPedido, int atendimento, int estabelecimento, int localizacao, int pratos) {
+        String sql = "INSERT INTO avaliacoes (numero_pedido, atendimento, estabelecimento, localizacao, pratos) VALUES (?, ?, ?, ?, ?)";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, numeroPedido);
+            stmt.setInt(2, atendimento);
+            stmt.setInt(3, estabelecimento);
+            stmt.setInt(4, localizacao);
+            stmt.setInt(5, pratos);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private String gerarCupom() {
+        Random random = new Random();
+        int codigo = random.nextInt(999999);
+        return "CUPOM" + String.format("%06d", codigo);
+    }
+
+    private void salvarCupom(String numeroPedido, String codigoCupom) {
+        String sql = "INSERT INTO cupons (numero_pedido, codigo_cupom) VALUES (?, ?)";
+        try (Connection conn = DatabaseConnection.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, numeroPedido);
+            stmt.setString(2, codigoCupom);
+            stmt.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void gerarQRCode(String cupom) {
+        int size = 250;
+        String fileType = "png";
+        File qrFile = new File("QRCode.png");
+
+        try {
+            Hashtable<EncodeHintType, ErrorCorrectionLevel> hintMap = new Hashtable<>();
+            hintMap.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.L);
+            QRCodeWriter qrCodeWriter = new QRCodeWriter();
+            BitMatrix byteMatrix = qrCodeWriter.encode(cupom, BarcodeFormat.QR_CODE, size, size, hintMap);
+            int width = byteMatrix.getWidth();
+            BufferedImage image = new BufferedImage(width, width, BufferedImage.TYPE_INT_RGB);
+            image.createGraphics();
+
+            Graphics2D graphics = (Graphics2D) image.getGraphics();
+            graphics.setColor(Color.WHITE);
+            graphics.fillRect(0, 0, width, width);
+            graphics.setColor(Color.BLACK);
+
+            for (int i = 0; i < width; i++) {
+                for (int j = 0; j < width; j++) {
+                    if (byteMatrix.get(i, j)) {
+                        graphics.fillRect(i, j, 1, 1);
+                    }
+                }
+            }
+            ImageIO.write(image, fileType, qrFile);
+
+            lblQRCode.setIcon(new ImageIcon(image));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private ImageIcon carregarIcone(String caminho) {
+        try {
+            URL url = getClass().getResource(caminho);
+            if (url != null) {
+                return new ImageIcon(url);
+            } else {
+                System.err.println("Ícone não encontrado: " + caminho);
+                return null;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                try {
+                    ClienteAvaliacaoGUI window = new ClienteAvaliacaoGUI();
+                    window.window.setVisible(true);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
+}
